@@ -15,8 +15,10 @@ export function initializeSocket(server: HTTPServer) {
     cors: {
       origin: process.env.NEXT_PUBLIC_APP_URL || '*',
       methods: ['GET', 'POST'],
+      credentials: true,
     },
     path: '/api/socket',
+    transports: ['websocket', 'polling'],
   });
 
   io.on('connection', async (socket) => {
@@ -41,6 +43,7 @@ export function initializeSocket(server: HTTPServer) {
         socket.join(data.sessionCode);
 
         if (data.role === 'lecturer') {
+          console.log(`Lecturer joined session ${data.sessionCode}, socket ID: ${socket.id}`);
           // Lecturer joined - notify all students
           socket.to(data.sessionCode).emit('lecturer-connected', {
             lecturerSocketId: socket.id,
@@ -91,14 +94,19 @@ export function initializeSocket(server: HTTPServer) {
             isActive: true,
           });
 
-          // Notify lecturer
-          socket.to(data.sessionCode).emit('student-joined', {
-            studentId: studentSession._id.toString(),
-            studentName: data.studentName,
-            socketId: socket.id,
-            deviceCount: newCount,
-            deviceLimit: session.deviceLimit,
-          });
+          // Notify lecturer (emit to all in room, including lecturer)
+          // io is guaranteed to be initialized here since we're inside io.on('connection')
+          if (io) {
+            io.to(data.sessionCode).emit('student-joined', {
+              studentId: studentSession._id.toString(),
+              studentName: data.studentName,
+              socketId: socket.id,
+              deviceCount: newCount,
+              deviceLimit: session.deviceLimit,
+            });
+            
+            console.log(`Student ${data.studentName} joined session ${data.sessionCode}. Notified room.`);
+          }
 
           socket.emit('session-joined', {
             sessionId: session._id.toString(),

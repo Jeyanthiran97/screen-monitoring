@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { io, Socket } from 'socket.io-client';
-import { Monitor, Maximize2, Minimize2, Users, Loader2, ArrowLeft, AlertCircle } from 'lucide-react';
+import { Monitor, Maximize2, Minimize2, Users, Loader2, ArrowLeft, AlertCircle, RefreshCw } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -67,22 +67,46 @@ export default function MonitorSessionPage() {
   };
 
   const connectSocket = () => {
-    const socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || '', {
+    // Use window.location.origin as fallback for client-side
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || (typeof window !== 'undefined' ? window.location.origin : '');
+    const socket = io(socketUrl, {
       path: '/api/socket',
+      transports: ['websocket', 'polling'],
     });
 
     socketRef.current = socket;
 
     socket.on('connect', () => {
+      console.log('Socket connected:', socket.id);
       socket.emit('join-session', { sessionCode, role: 'lecturer' });
     });
 
-    socket.on('lecturer-joined', () => {
-      // Lecturer successfully joined, notify existing students
+    socket.on('connect_error', (error) => {
+      console.error('Socket connection error:', error);
+      toast.error('Failed to connect to server. Please refresh the page.');
+    });
+
+    socket.on('disconnect', (reason) => {
+      console.log('Socket disconnected:', reason);
+      if (reason === 'io server disconnect') {
+        // Server disconnected the socket, try to reconnect
+        socket.connect();
+      }
+    });
+
+    socket.on('error', (error: { message: string }) => {
+      console.error('Socket error:', error);
+      toast.error(error.message || 'Socket error occurred');
+    });
+
+    socket.on('lecturer-joined', (data) => {
+      console.log('Lecturer joined session:', data);
+      // Lecturer successfully joined, fetch existing students
       fetchStudents();
     });
 
     socket.on('student-joined', async (data: { studentId: string; studentName: string; socketId: string; deviceCount?: number; deviceLimit?: number }) => {
+      console.log('Student joined event received:', data);
       toast.success(`${data.studentName} joined the session`);
       const newStudent = {
         id: data.studentId,
@@ -90,7 +114,13 @@ export default function MonitorSessionPage() {
         socketId: data.socketId,
         connectedAt: new Date().toISOString(),
       };
-      setStudents((prev) => [...prev, newStudent]);
+      setStudents((prev) => {
+        // Check if student already exists to avoid duplicates
+        if (prev.find(s => s.id === data.studentId)) {
+          return prev;
+        }
+        return [...prev, newStudent];
+      });
       
       if (data.deviceCount !== undefined) {
         setDeviceCount(data.deviceCount);
@@ -237,8 +267,22 @@ export default function MonitorSessionPage() {
               )}
             </div>
           </div>
-          <div className="text-sm text-gray-400">
-            Session: <code className="bg-gray-700 px-2 py-1 rounded">{sessionCode}</code>
+          <div className="flex items-center gap-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                fetchStudents();
+                toast.info('Refreshing student list...');
+              }}
+              className="text-gray-300 border-gray-600 hover:bg-gray-700"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+            <div className="text-sm text-gray-400">
+              Session: <code className="bg-gray-700 px-2 py-1 rounded">{sessionCode}</code>
+            </div>
           </div>
         </div>
       </header>

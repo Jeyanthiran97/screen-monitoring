@@ -154,17 +154,32 @@ export default function JoinSessionPage() {
 
     try {
       // Connect to Socket.IO
-      const socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || '', {
+      const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || (typeof window !== 'undefined' ? window.location.origin : '');
+      const socket = io(socketUrl, {
         path: '/api/socket',
+        transports: ['websocket', 'polling'],
       });
 
       socketRef.current = socket;
 
       socket.on('connect', () => {
+        console.log('Student socket connected:', socket.id);
         socket.emit('join-session', {
           sessionCode,
           studentName: data.studentName,
         });
+      });
+
+      socket.on('connect_error', (error) => {
+        console.error('Socket connection error:', error);
+        toast.error('Failed to connect to server. Please try again.');
+        setIsJoining(false);
+      });
+
+      socket.on('error', (error: { message: string }) => {
+        console.error('Socket error:', error);
+        toast.error(error.message || 'An error occurred');
+        setIsJoining(false);
       });
 
       let lecturerSocketId: string | null = null;
