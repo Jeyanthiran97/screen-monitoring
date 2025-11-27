@@ -7,9 +7,9 @@ import { cookies } from 'next/headers';
 
 // API schema (without confirmPassword since it's only for frontend validation)
 const registerApiSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters'),
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  name: z.string().min(2, { message: 'Name must be at least 2 characters' }),
+  email: z.string().email({ message: 'Invalid email address' }),
+  password: z.string().min(6, { message: 'Password must be at least 6 characters' }),
 });
 
 export async function POST(request: NextRequest) {

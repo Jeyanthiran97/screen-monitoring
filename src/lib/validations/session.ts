@@ -11,8 +11,8 @@ export const createSessionSchema = z.object({
     message: 'Please select an expiration type',
   }),
   expirationDate: z.string().optional(),
-  expirationTime: z.number().min(1, 'Time must be at least 1 minute').optional(),
-  deviceLimit: z.number().min(1, 'Device limit must be at least 1').optional(),
+  expirationTime: z.number().min(1, { message: 'Time must be at least 1 minute' }).optional(),
+  deviceLimit: z.number().min(1, { message: 'Device limit must be at least 1' }).optional(),
 }).refine((data) => {
   // If date-duration, expirationDate is required
   if (data.expirationType === 'date-duration') {
