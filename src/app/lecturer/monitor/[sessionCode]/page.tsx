@@ -69,13 +69,12 @@ export default function MonitorSessionPage() {
   const connectSocket = () => {
     // Use window.location.origin as fallback for client-side
     const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || (typeof window !== 'undefined' ? window.location.origin : '');
-    // Use polling-only transport for Vercel compatibility
-    // Vercel serverless functions don't support long-lived WebSocket connections
-    // For production, consider using a separate Socket.IO server (Railway, Render, etc.)
+    // Use polling-first transport for better compatibility
+    // If using separate Socket.IO server, it will support both polling and websocket
     const socket = io(socketUrl, {
-      path: '/api/socket',
-      transports: ['polling'], // Polling-only for Vercel serverless compatibility
-      upgrade: false, // Disable upgrade to websocket
+      path: socketUrl.includes('socket.io') ? '/socket.io' : '/api/socket',
+      transports: ['polling', 'websocket'], // Try polling first, then upgrade to websocket if available
+      upgrade: true,
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
@@ -92,7 +91,16 @@ export default function MonitorSessionPage() {
 
     socket.on('connect_error', (error) => {
       console.error('Socket connection error:', error);
-      toast.error('Failed to connect to server. Please refresh the page.');
+      const errorMessage = error.message || 'Unknown error';
+      
+      if (errorMessage.includes('server error') || errorMessage.includes('503')) {
+        toast.error(
+          'Socket.IO server not available. Vercel does not support WebSocket connections. Please deploy Socket.IO separately.',
+          { duration: 10000 }
+        );
+      } else {
+        toast.error(`Connection failed: ${errorMessage}. Please check your network and try again.`, { duration: 5000 });
+      }
     });
 
     socket.on('disconnect', (reason) => {
