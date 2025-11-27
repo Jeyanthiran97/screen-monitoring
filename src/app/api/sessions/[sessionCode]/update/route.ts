@@ -4,8 +4,12 @@ import Session from '@/models/Session';
 import { requireAuth } from '@/lib/auth';
 import { createSessionSchema } from '@/lib/validations/session';
 import { z } from 'zod';
+import mongoose from 'mongoose';
 
-export async function POST(request: NextRequest) {
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ sessionCode: string }> | { sessionCode: string } }
+) {
   try {
     const lecturer = await requireAuth('lecturer');
     const body = await request.json();
@@ -13,28 +17,42 @@ export async function POST(request: NextRequest) {
 
     await connectDB();
 
-    const sessionData: any = {
-      lecturerId: lecturer.id,
-      modeType: validatedData.modeType,
-      shareType: validatedData.shareType,
-      expirationType: validatedData.expirationType,
-      deviceLimit: validatedData.deviceLimit,
-    };
+    // Handle params as Promise (Next.js 16) or object
+    const resolvedParams = params instanceof Promise ? await params : params;
+    const sessionCode = resolvedParams.sessionCode;
+
+    const session = await Session.findOne({ sessionCode, lecturerId: lecturer.id });
+
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Session not found' },
+        { status: 404 }
+      );
+    }
+
+    // Update session fields
+    session.modeType = validatedData.modeType;
+    session.shareType = validatedData.shareType;
+    session.expirationType = validatedData.expirationType;
+    session.deviceLimit = validatedData.deviceLimit;
 
     if (validatedData.expirationType === 'date-duration' && validatedData.expirationDate) {
-      sessionData.expirationDate = new Date(validatedData.expirationDate);
+      session.expirationDate = new Date(validatedData.expirationDate);
+    } else {
+      session.expirationDate = undefined;
     }
 
     if (validatedData.expirationType === 'time-based' && validatedData.expirationTime) {
-      sessionData.expirationTime = validatedData.expirationTime;
+      session.expirationTime = validatedData.expirationTime;
+    } else {
+      session.expirationTime = undefined;
     }
 
-    const session = new Session(sessionData);
     await session.save();
 
     return NextResponse.json(
       {
-        message: 'Session created successfully',
+        message: 'Session updated successfully',
         session: {
           id: session._id.toString(),
           sessionCode: session.sessionCode,
@@ -46,9 +64,10 @@ export async function POST(request: NextRequest) {
           deviceLimit: session.deviceLimit,
           isActive: session.isActive,
           createdAt: session.createdAt,
+          updatedAt: session.updatedAt,
         },
       },
-      { status: 201 }
+      { status: 200 }
     );
   } catch (error: any) {
     if (error instanceof z.ZodError) {
@@ -73,9 +92,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.error('Create session error:', error);
+    console.error('Update session error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: error.message || 'Internal server error' },
       { status: 500 }
     );
   }

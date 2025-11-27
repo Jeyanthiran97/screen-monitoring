@@ -32,6 +32,12 @@ export function initializeSocket(server: HTTPServer) {
           return;
         }
 
+        // Check if session is expired
+        if (session.isExpired() || !session.isActive) {
+          socket.emit('error', { message: 'Session has expired or is inactive' });
+          return;
+        }
+
         socket.join(data.sessionCode);
 
         if (data.role === 'lecturer') {
@@ -45,6 +51,27 @@ export function initializeSocket(server: HTTPServer) {
             shareType: session.shareType,
           });
         } else if (data.studentName) {
+          // Check device limit
+          const activeStudents = await StudentSession.countDocuments({
+            sessionId: session._id,
+            isActive: true,
+          });
+
+          if (session.deviceLimit && activeStudents >= session.deviceLimit) {
+            socket.emit('error', { 
+              message: `Device limit reached. Maximum ${session.deviceLimit} device(s) allowed.` 
+            });
+            
+            // Notify lecturer about limit exceeded
+            socket.to(data.sessionCode).emit('device-limit-exceeded', {
+              sessionCode: data.sessionCode,
+              currentCount: activeStudents,
+              limit: session.deviceLimit,
+              attemptedBy: data.studentName,
+            });
+            return;
+          }
+
           // Student joined
           const studentSession = await StudentSession.findOneAndUpdate(
             { sessionId: session._id, socketId: socket.id },
@@ -58,11 +85,19 @@ export function initializeSocket(server: HTTPServer) {
             { upsert: true, new: true }
           );
 
+          // Get updated count
+          const newCount = await StudentSession.countDocuments({
+            sessionId: session._id,
+            isActive: true,
+          });
+
           // Notify lecturer
           socket.to(data.sessionCode).emit('student-joined', {
             studentId: studentSession._id.toString(),
             studentName: data.studentName,
             socketId: socket.id,
+            deviceCount: newCount,
+            deviceLimit: session.deviceLimit,
           });
 
           socket.emit('session-joined', {
@@ -116,9 +151,16 @@ export function initializeSocket(server: HTTPServer) {
 
           const session = await Session.findById(studentSession.sessionId);
           if (session) {
+            const newCount = await StudentSession.countDocuments({
+              sessionId: session._id,
+              isActive: true,
+            });
+
             socket.to(session.sessionCode).emit('student-left', {
               studentId: studentSession._id.toString(),
               studentName: studentSession.studentName,
+              deviceCount: newCount,
+              deviceLimit: session.deviceLimit,
             });
           }
         }

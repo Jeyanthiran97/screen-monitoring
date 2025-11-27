@@ -20,7 +20,19 @@ export async function GET(
       );
     }
 
-    return NextResponse.json({ session }, { status: 200 });
+    // Check if session is expired
+    const isExpired = session.isExpired();
+    if (isExpired && session.isActive) {
+      session.isActive = false;
+      await session.save();
+    }
+
+    return NextResponse.json({ 
+      session: {
+        ...session.toObject(),
+        isExpired,
+      }
+    }, { status: 200 });
   } catch (error) {
     console.error('Get session error:', error);
     return NextResponse.json(

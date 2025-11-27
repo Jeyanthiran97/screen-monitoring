@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { io, Socket } from 'socket.io-client';
-import { Monitor, Maximize2, Minimize2, Users, Loader2, ArrowLeft } from 'lucide-react';
+import { Monitor, Maximize2, Minimize2, Users, Loader2, ArrowLeft, AlertCircle } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,6 +24,8 @@ export default function MonitorSessionPage() {
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [deviceCount, setDeviceCount] = useState(0);
+  const [deviceLimit, setDeviceLimit] = useState<number | undefined>(undefined);
   const socketRef = useRef<Socket | null>(null);
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const videoRefsRef = useRef<Map<string, HTMLVideoElement>>(new Map());
@@ -42,12 +44,21 @@ export default function MonitorSessionPage() {
 
   const fetchStudents = async () => {
     try {
-      const response = await fetch(`/api/sessions/${sessionCode}/students`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch students');
+      const [studentsResponse, sessionResponse] = await Promise.all([
+        fetch(`/api/sessions/${sessionCode}/students`),
+        fetch(`/api/sessions/${sessionCode}`),
+      ]);
+      
+      if (!studentsResponse.ok || !sessionResponse.ok) {
+        throw new Error('Failed to fetch data');
       }
-      const data = await response.json();
-      setStudents(data.students);
+      
+      const studentsData = await studentsResponse.json();
+      const sessionData = await sessionResponse.json();
+      
+      setStudents(studentsData.students);
+      setDeviceCount(studentsData.students.length);
+      setDeviceLimit(sessionData.session?.deviceLimit);
     } catch (error) {
       toast.error('Failed to load students');
     } finally {
@@ -71,7 +82,7 @@ export default function MonitorSessionPage() {
       fetchStudents();
     });
 
-    socket.on('student-joined', async (data: { studentId: string; studentName: string; socketId: string }) => {
+    socket.on('student-joined', async (data: { studentId: string; studentName: string; socketId: string; deviceCount?: number; deviceLimit?: number }) => {
       toast.success(`${data.studentName} joined the session`);
       const newStudent = {
         id: data.studentId,
@@ -80,6 +91,13 @@ export default function MonitorSessionPage() {
         connectedAt: new Date().toISOString(),
       };
       setStudents((prev) => [...prev, newStudent]);
+      
+      if (data.deviceCount !== undefined) {
+        setDeviceCount(data.deviceCount);
+      }
+      if (data.deviceLimit !== undefined) {
+        setDeviceLimit(data.deviceLimit);
+      }
 
       // Notify student that lecturer is connected
       socket.emit('lecturer-connected', {
@@ -88,9 +106,23 @@ export default function MonitorSessionPage() {
       });
     });
 
-    socket.on('student-left', (data: { studentId: string; studentName: string }) => {
+    socket.on('device-limit-exceeded', (data: { sessionCode: string; currentCount: number; limit: number; attemptedBy: string }) => {
+      toast.error(
+        `Device limit exceeded! ${data.attemptedBy} tried to join but limit is ${data.limit} devices. Current: ${data.currentCount}`,
+        { duration: 10000 }
+      );
+    });
+
+    socket.on('student-left', (data: { studentId: string; studentName: string; deviceCount?: number; deviceLimit?: number }) => {
       toast.info(`${data.studentName} left the session`);
       setStudents((prev) => prev.filter((s) => s.id !== data.studentId));
+      
+      if (data.deviceCount !== undefined) {
+        setDeviceCount(data.deviceCount);
+      }
+      if (data.deviceLimit !== undefined) {
+        setDeviceLimit(data.deviceLimit);
+      }
 
       // Cleanup peer connection
       const pc = peerConnectionsRef.current.get(data.studentId);
@@ -190,9 +222,19 @@ export default function MonitorSessionPage() {
               <Monitor className="h-6 w-6 text-blue-400" />
               <h1 className="text-xl font-bold">Monitoring Session</h1>
             </div>
-            <div className="flex items-center gap-2 text-sm text-gray-400">
-              <Users className="h-4 w-4" />
-              <span>{students.length} student{students.length !== 1 ? 's' : ''}</span>
+            <div className="flex items-center gap-4 text-sm text-gray-400">
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                <span>{deviceCount || students.length} device{deviceCount !== 1 ? 's' : ''}</span>
+              </div>
+              {deviceLimit && (
+                <div className={`flex items-center gap-2 ${
+                  deviceCount >= deviceLimit ? 'text-red-400' : deviceCount >= deviceLimit * 0.8 ? 'text-yellow-400' : ''
+                }`}>
+                  <AlertCircle className="h-4 w-4" />
+                  <span>Limit: {deviceLimit}</span>
+                </div>
+              )}
             </div>
           </div>
           <div className="text-sm text-gray-400">
