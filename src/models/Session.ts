@@ -31,9 +31,10 @@ const SessionSchema = new Schema<ISession>(
     },
     sessionCode: {
       type: String,
-      required: true,
+      required: false, // Will be generated in pre-save hook
       unique: true,
       index: true,
+      sparse: true, // Allow null values for uniqueness check
     },
   },
   {
@@ -42,23 +43,33 @@ const SessionSchema = new Schema<ISession>(
 );
 
 // Generate unique session code before saving
-SessionSchema.pre('save', async function (next) {
-  if (!this.isNew || this.sessionCode) return next();
+SessionSchema.pre('save', async function () {
+  // Only generate code for new documents that don't have a sessionCode
+  if (this.sessionCode) {
+    return;
+  }
   
   const generateCode = () => {
     return Math.random().toString(36).substring(2, 10).toUpperCase();
   };
   
   let code = generateCode();
-  let exists = await mongoose.models.Session?.findOne({ sessionCode: code });
+  const SessionModel = mongoose.models.Session || mongoose.model('Session', SessionSchema);
+  let exists = await SessionModel.findOne({ sessionCode: code });
   
-  while (exists) {
+  // Keep generating until we find a unique code (max 100 attempts)
+  let attempts = 0;
+  while (exists && attempts < 100) {
     code = generateCode();
-    exists = await mongoose.models.Session?.findOne({ sessionCode: code });
+    exists = await SessionModel.findOne({ sessionCode: code });
+    attempts++;
+  }
+  
+  if (attempts >= 100) {
+    throw new Error('Failed to generate unique session code');
   }
   
   this.sessionCode = code;
-  next();
 });
 
 const Session: Model<ISession> = mongoose.models.Session || mongoose.model<ISession>('Session', SessionSchema);
