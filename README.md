@@ -52,12 +52,17 @@ npm install
 ```
 
 3. Create a `.env.local` file in the root directory:
-```env
-MONGODB_URI=mongodb://localhost:27017/screen-monitoring
-JWT_SECRET=your-secret-key-change-this-in-production
-NEXT_PUBLIC_SOCKET_URL=http://localhost:3000
-NEXT_PUBLIC_APP_URL=http://localhost:3000
+```bash
+cp .env.example .env.local
 ```
+
+Then edit `.env.local` and update the following required variables:
+- `MONGODB_URI` - Your MongoDB connection string
+- `JWT_SECRET` - A strong random string (generate with: `openssl rand -base64 32`)
+- `NEXT_PUBLIC_APP_URL` - Your application URL (http://localhost:3000 for dev)
+- `NEXT_PUBLIC_SOCKET_URL` - Socket.IO server URL (usually same as APP_URL)
+
+See `.env.example` for all available environment variables and detailed documentation.
 
 4. Seed the admin user:
 ```bash
