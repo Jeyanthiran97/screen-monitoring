@@ -1,7 +1,13 @@
+require('dotenv').config();
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/screen-monitoring';
+const MONGODB_URI = process.env.MONGODB_URI;
+
+if (!MONGODB_URI) {
+  console.error('Error: MONGODB_URI is not defined in .env file');
+  process.exit(1);
+}
 
 const UserSchema = new mongoose.Schema({
   name: { type: String, required: true },
