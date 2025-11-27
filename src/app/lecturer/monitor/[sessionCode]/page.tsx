@@ -66,20 +66,26 @@ export default function MonitorSessionPage() {
       socket.emit('join-session', { sessionCode, role: 'lecturer' });
     });
 
+    socket.on('lecturer-joined', () => {
+      // Lecturer successfully joined, notify existing students
+      fetchStudents();
+    });
+
     socket.on('student-joined', async (data: { studentId: string; studentName: string; socketId: string }) => {
       toast.success(`${data.studentName} joined the session`);
-      setStudents((prev) => [
-        ...prev,
-        {
-          id: data.studentId,
-          studentName: data.studentName,
-          socketId: data.socketId,
-          connectedAt: new Date().toISOString(),
-        },
-      ]);
+      const newStudent = {
+        id: data.studentId,
+        studentName: data.studentName,
+        socketId: data.socketId,
+        connectedAt: new Date().toISOString(),
+      };
+      setStudents((prev) => [...prev, newStudent]);
 
-      // Setup WebRTC connection
-      await setupPeerConnection(data.socketId, data.studentId);
+      // Notify student that lecturer is connected
+      socket.emit('lecturer-connected', {
+        lecturerSocketId: socket.id,
+        targetSocketId: data.socketId,
+      });
     });
 
     socket.on('student-left', (data: { studentId: string; studentName: string }) => {

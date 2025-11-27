@@ -84,6 +84,12 @@ export function initializeSocket(server: HTTPServer) {
       });
     });
 
+    socket.on('lecturer-connected', (data: { lecturerSocketId: string; targetSocketId: string }) => {
+      socket.to(data.targetSocketId).emit('lecturer-connected', {
+        lecturerSocketId: data.lecturerSocketId,
+      });
+    });
+
     socket.on('answer', (data: { answer: RTCSessionDescriptionInit; targetSocketId: string }) => {
       socket.to(data.targetSocketId).emit('answer', {
         answer: data.answer,
