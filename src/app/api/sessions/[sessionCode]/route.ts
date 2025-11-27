@@ -4,12 +4,14 @@ import Session from '@/models/Session';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { sessionCode: string } }
+  { params }: { params: Promise<{ sessionCode: string }> | { sessionCode: string } }
 ) {
   try {
     await connectDB();
 
-    const session = await Session.findOne({ sessionCode: params.sessionCode });
+    // Handle params as Promise (Next.js 16) or object
+    const resolvedParams = params instanceof Promise ? await params : params;
+    const session = await Session.findOne({ sessionCode: resolvedParams.sessionCode });
 
     if (!session) {
       return NextResponse.json(

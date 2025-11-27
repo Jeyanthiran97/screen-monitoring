@@ -75,14 +75,17 @@ export default function AdminDashboard() {
         method: 'POST',
       });
 
+      const result = await response.json();
+
       if (!response.ok) {
-        throw new Error('Failed to approve lecturer');
+        toast.error(result.error || 'Failed to approve lecturer');
+        return;
       }
 
       toast.success('Lecturer approved successfully');
       fetchLecturers();
-    } catch (error) {
-      toast.error('Failed to approve lecturer');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to approve lecturer');
     }
   };
 
@@ -92,14 +95,17 @@ export default function AdminDashboard() {
         method: 'POST',
       });
 
+      const result = await response.json();
+
       if (!response.ok) {
-        throw new Error('Failed to reject lecturer');
+        toast.error(result.error || 'Failed to reject lecturer');
+        return;
       }
 
       toast.success('Lecturer rejected');
       fetchLecturers();
-    } catch (error) {
-      toast.error('Failed to reject lecturer');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to reject lecturer');
     }
   };
 

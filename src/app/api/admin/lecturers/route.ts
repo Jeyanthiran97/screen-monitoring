@@ -10,9 +10,21 @@ export async function GET() {
 
     const lecturers = await User.find({ role: 'lecturer' })
       .select('-password')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
-    return NextResponse.json({ lecturers }, { status: 200 });
+    // Ensure _id is converted to string for JSON serialization
+    const formattedLecturers = lecturers.map((lecturer: any) => ({
+      _id: lecturer._id.toString(),
+      name: lecturer.name,
+      email: lecturer.email,
+      role: lecturer.role,
+      isApproved: lecturer.isApproved,
+      createdAt: lecturer.createdAt,
+      updatedAt: lecturer.updatedAt,
+    }));
+
+    return NextResponse.json({ lecturers: formattedLecturers }, { status: 200 });
   } catch (error: any) {
     if (error.message === 'Unauthorized' || error.message === 'Forbidden') {
       return NextResponse.json(
