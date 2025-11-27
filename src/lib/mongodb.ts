@@ -1,10 +1,21 @@
 import mongoose from 'mongoose';
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/screen-monitoring';
+// Get MongoDB URI from environment
+const MONGODB_URI = process.env.MONGODB_URI;
 
+// In production, fail fast if MONGODB_URI is not set
 if (!MONGODB_URI) {
-  throw new Error('Please define the MONGODB_URI environment variable inside .env.local');
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'MONGODB_URI environment variable is required in production. ' +
+      'Please set it in your Vercel project settings.'
+    );
+  }
+  // In development, use localhost as fallback
+  console.warn('MONGODB_URI not set, using default localhost connection');
 }
+
+const finalMongoUri = MONGODB_URI || 'mongodb://localhost:27017/screen-monitoring';
 
 interface MongooseCache {
   conn: typeof mongoose | null;
@@ -31,15 +42,20 @@ async function connectDB() {
       bufferCommands: false,
     };
 
-    cached.promise = mongoose.connect(MONGODB_URI, opts).then((mongoose) => {
+    cached.promise = mongoose.connect(finalMongoUri, opts).then((mongoose) => {
       return mongoose;
     });
   }
 
   try {
     cached.conn = await cached.promise;
-  } catch (e) {
+    console.log('✅ MongoDB connected successfully');
+  } catch (e: any) {
     cached.promise = null;
+    console.error('❌ MongoDB connection error:', e.message);
+    if (process.env.NODE_ENV === 'production') {
+      console.error('Make sure MONGODB_URI is set correctly in Vercel environment variables');
+    }
     throw e;
   }
 
