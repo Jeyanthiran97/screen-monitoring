@@ -10,13 +10,23 @@ export interface JWTPayload {
 }
 
 export function signToken(payload: JWTPayload): string {
-  return jwt.sign(payload, JWT_SECRET, {
-    expiresIn: JWT_EXPIRES_IN,
-  });
+  if (!JWT_SECRET) {
+    throw new Error('JWT_SECRET is not defined');
+  }
+  return jwt.sign(
+    payload,
+    JWT_SECRET,
+    {
+      expiresIn: JWT_EXPIRES_IN,
+    } as jwt.SignOptions
+  );
 }
 
 export function verifyToken(token: string): JWTPayload {
   try {
+    if (!JWT_SECRET) {
+      throw new Error('JWT_SECRET is not defined');
+    }
     return jwt.verify(token, JWT_SECRET) as JWTPayload;
   } catch (error) {
     throw new Error('Invalid or expired token');

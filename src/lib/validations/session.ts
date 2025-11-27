@@ -2,13 +2,13 @@ import { z } from 'zod';
 
 export const createSessionSchema = z.object({
   modeType: z.enum(['internet', 'lan'], {
-    required_error: 'Please select a connection mode',
+    message: 'Please select a connection mode',
   }),
   shareType: z.enum(['full-screen', 'partial'], {
-    required_error: 'Please select a screen sharing mode',
+    message: 'Please select a screen sharing mode',
   }),
   expirationType: z.enum(['no-expiration', 'date-duration', 'time-based'], {
-    required_error: 'Please select an expiration type',
+    message: 'Please select an expiration type',
   }),
   expirationDate: z.string().optional(),
   expirationTime: z.number().min(1, 'Time must be at least 1 minute').optional(),

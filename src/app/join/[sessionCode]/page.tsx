@@ -83,9 +83,9 @@ export default function JoinSessionPage() {
 
   const startPreview = async () => {
     try {
-      const constraints: DisplayMediaStreamConstraints = {
+      const constraints: MediaStreamConstraints = {
         video: session?.shareType === 'full-screen'
-          ? { displaySurface: 'monitor' as DisplayCaptureSurfaceType }
+          ? { displaySurface: 'monitor' as any }
           : true,
         audio: false,
       };
