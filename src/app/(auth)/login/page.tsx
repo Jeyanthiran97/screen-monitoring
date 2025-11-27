@@ -41,7 +41,24 @@ export default function LoginPage() {
       const result = await response.json();
 
       if (!response.ok) {
-        toast.error(result.error || 'Login failed');
+        // Handle validation errors
+        if (result.details && Array.isArray(result.details)) {
+          // Set field-specific errors
+          result.details.forEach((error: any) => {
+            const fieldPath = error.path || [];
+            if (fieldPath.length > 0) {
+              const fieldName = fieldPath[0] as keyof LoginInput;
+              form.setError(fieldName, {
+                type: 'server',
+                message: error.message || 'Invalid value',
+              });
+            }
+          });
+          // Don't show toast for validation errors - they're shown under fields
+        } else {
+          // Non-validation error (like invalid credentials)
+          toast.error(result.error || 'Login failed');
+        }
         return;
       }
 

@@ -3,6 +3,7 @@ import connectDB from '@/lib/mongodb';
 import Session from '@/models/Session';
 import { requireAuth } from '@/lib/auth';
 import { createSessionSchema } from '@/lib/validations/session';
+import { z } from 'zod';
 
 export async function POST(request: NextRequest) {
   try {
@@ -34,9 +35,17 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error: any) {
-    if (error.name === 'ZodError') {
+    if (error instanceof z.ZodError) {
+      const formattedErrors = error.errors.map((err) => ({
+        path: err.path,
+        message: err.message,
+      }));
+      
       return NextResponse.json(
-        { error: 'Validation error', details: error.errors },
+        { 
+          error: 'Validation error', 
+          details: formattedErrors 
+        },
         { status: 400 }
       );
     }

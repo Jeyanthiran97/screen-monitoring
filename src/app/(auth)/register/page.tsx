@@ -48,7 +48,24 @@ export default function RegisterPage() {
       const result = await response.json();
 
       if (!response.ok) {
-        toast.error(result.error || 'Registration failed');
+        // Handle validation errors
+        if (result.details && Array.isArray(result.details)) {
+          // Set field-specific errors
+          result.details.forEach((error: any) => {
+            const fieldPath = error.path || [];
+            if (fieldPath.length > 0) {
+              const fieldName = fieldPath[0] as keyof RegisterInput;
+              form.setError(fieldName, {
+                type: 'server',
+                message: error.message || 'Invalid value',
+              });
+            }
+          });
+          // Don't show toast for validation errors - they're shown under fields
+        } else {
+          // Non-validation error
+          toast.error(result.error || 'Registration failed');
+        }
         return;
       }
 

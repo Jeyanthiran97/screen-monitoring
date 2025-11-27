@@ -4,6 +4,7 @@ import User from '@/models/User';
 import { loginSchema } from '@/lib/validations/auth';
 import { signToken } from '@/lib/jwt';
 import { cookies } from 'next/headers';
+import { z } from 'zod';
 
 export async function POST(request: NextRequest) {
   try {
@@ -69,16 +70,24 @@ export async function POST(request: NextRequest) {
       { status: 200 }
     );
   } catch (error: any) {
-    if (error.name === 'ZodError') {
+    if (error instanceof z.ZodError) {
+      const formattedErrors = error.errors.map((err) => ({
+        path: err.path,
+        message: err.message,
+      }));
+      
       return NextResponse.json(
-        { error: 'Validation error', details: error.errors },
+        { 
+          error: 'Validation error', 
+          details: formattedErrors 
+        },
         { status: 400 }
       );
     }
 
     console.error('Login error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: error.message || 'Internal server error' },
       { status: 500 }
     );
   }

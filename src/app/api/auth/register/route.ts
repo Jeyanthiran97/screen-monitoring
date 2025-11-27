@@ -1,14 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/mongodb';
 import User from '@/models/User';
-import { registerSchema } from '@/lib/validations/auth';
+import { z } from 'zod';
 import { signToken } from '@/lib/jwt';
 import { cookies } from 'next/headers';
+
+// API schema (without confirmPassword since it's only for frontend validation)
+const registerApiSchema = z.object({
+  name: z.string().min(2, 'Name must be at least 2 characters'),
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+});
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const validatedData = registerSchema.parse(body);
+    const validatedData = registerApiSchema.parse(body);
 
     await connectDB();
 
@@ -62,16 +69,24 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error: any) {
-    if (error.name === 'ZodError') {
+    if (error instanceof z.ZodError) {
+      const formattedErrors = error.errors.map((err) => ({
+        path: err.path,
+        message: err.message,
+      }));
+      
       return NextResponse.json(
-        { error: 'Validation error', details: error.errors },
+        { 
+          error: 'Validation error', 
+          details: formattedErrors 
+        },
         { status: 400 }
       );
     }
 
     console.error('Registration error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: error.message || 'Internal server error' },
       { status: 500 }
     );
   }
