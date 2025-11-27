@@ -155,9 +155,18 @@ export default function JoinSessionPage() {
     try {
       // Connect to Socket.IO
       const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || (typeof window !== 'undefined' ? window.location.origin : '');
+      // Use polling-only transport for Vercel compatibility
+      // Vercel serverless functions don't support long-lived WebSocket connections
+      // For production, consider using a separate Socket.IO server (Railway, Render, etc.)
       const socket = io(socketUrl, {
         path: '/api/socket',
-        transports: ['websocket', 'polling'],
+        transports: ['polling'], // Polling-only for Vercel serverless compatibility
+        upgrade: false, // Disable upgrade to websocket
+        reconnection: true,
+        reconnectionAttempts: Infinity,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        timeout: 20000,
       });
 
       socketRef.current = socket;

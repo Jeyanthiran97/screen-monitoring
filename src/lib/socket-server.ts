@@ -18,7 +18,10 @@ export function initializeSocket(server: HTTPServer) {
       credentials: true,
     },
     path: '/api/socket',
-    transports: ['websocket', 'polling'],
+    transports: ['polling', 'websocket'], // Polling first for better compatibility
+    allowEIO3: true, // Allow Engine.IO v3 clients
+    pingTimeout: 60000,
+    pingInterval: 25000,
   });
 
   io.on('connection', async (socket) => {
